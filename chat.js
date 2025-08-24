@@ -1,202 +1,105 @@
-const chatBox = document.getElementById("chatBox");
-const userInput = document.getElementById("userInput");
-const sendBtn = document.getElementById("sendBtn");
-const voiceBtn = document.getElementById("voiceBtn");
-const statusEl = document.getElementById("status");
+let userName = localStorage.getItem("userName");
 
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-const synth = window.speechSynthesis;
+window.onload = function () {
+  const chatBox = document.getElementById("chatBox");
 
-let recognition;
-let maleVoice = null;
-let karenVoice = null;
-let karenActive = false; // 👈 Hotword state
+  if (!chatBox) return;
 
-/* ---------------- PRELOAD VOICES ---------------- */
-function loadVoices() {
-  const voices = synth.getVoices();
-  if (!voices.length) return;
+  if (!userName) {
+    const askName = document.createElement("div");
+    askName.className = "message bot";
+    askName.textContent = "Hello! What should I call you?";
+    chatBox.appendChild(askName);
+  } else {
+    greetUser(userName);
+  }
+};
 
-  maleVoice = voices.find(v =>
-    v.name.toLowerCase().includes("male") ||
-    v.name.toLowerCase().includes("daniel") ||
-    v.name.toLowerCase().includes("alex")
-  ) || voices[0];
+function sendMessage() {
+  const input = document.getElementById("userInput");
+  const chatBox = document.getElementById("chatBox");
 
-  karenVoice = voices.find(v =>
-    v.name.toLowerCase().includes("female") ||
-    v.name.toLowerCase().includes("karen") ||
-    v.name.toLowerCase().includes("google us english") ||
-    v.name.toLowerCase().includes("samantha")
-  ) || voices[0];
-}
+  if (!input || !chatBox) return;
 
-synth.onvoiceschanged = loadVoices;
-loadVoices();
+  const userMessage = input.value.trim();
+  if (userMessage === "") return;
 
-/* ---------------- SPEAK ---------------- */
-function speak(text, useKaren = false) {
-  const utter = new SpeechSynthesisUtterance(text);
-  utter.voice = useKaren ? karenVoice : maleVoice;
-  utter.rate = 1;
-  utter.pitch = useKaren ? 1.1 : 1;
-  synth.speak(utter);
-}
+  const userDiv = document.createElement("div");
+  userDiv.className = "message user";
+  userDiv.textContent = userMessage;
+  chatBox.appendChild(userDiv);
+  input.value = "";
 
-/* ---------------- CHAT UI ---------------- */
-function addMessage(sender, text) {
-  const msg = document.createElement("div");
-  msg.classList.add("message", sender);
-  msg.innerText = text;
-  chatBox.appendChild(msg);
   chatBox.scrollTop = chatBox.scrollHeight;
-  statusEl.textContent = sender.toUpperCase() + ": " + text;
-}
 
-/* ---------------- HANDLE COMMANDS ---------------- */
-async function handleCommand(command, useKaren = false) {
-  command = command.toLowerCase();
-  let response = "";
+  if (!userName) {
+    userName = userMessage;
+    localStorage.setItem("userName", userName);
 
-  if (command.includes("open youtube") || command.includes("open yt")) {
-    response = "Opening YouTube.";
-    window.open("https://youtube.com", "_blank");
+    const botDiv = document.createElement("div");
+    botDiv.className = "message bot";
+    botDiv.textContent = `Nice to meet you, ${userName}!`;
+    chatBox.appendChild(botDiv);
+    chatBox.scrollTop = chatBox.scrollHeight;
+    return;
   }
 
-  else if (command.startsWith("search wikipedia") || command.includes("wikipedia")) {
-    let query = command.replace("search wikipedia", "").replace("wikipedia", "").trim();
-    if (!query) {
-      response = "What should I search on Wikipedia?";
-    } else {
-      response = `Searching Wikipedia for ${query}...`;
-      try {
-        const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*`;
-        const res = await fetch(searchUrl);
-        const data = await res.json();
+  const botDiv = document.createElement("div");
+  botDiv.className = "message bot";
+  botDiv.innerHTML = generateReply(userMessage);
+  chatBox.appendChild(botDiv);
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
 
-        if (data.query.search.length > 0) {
-          let firstResult = data.query.search[0].title;
-          const summaryUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(firstResult)}`;
-          const summaryRes = await fetch(summaryUrl);
-          const summaryData = await summaryRes.json();
+function generateReply(message) {
+  const msg = message.toLowerCase();
 
-          response = summaryData.extract || `Opening ${firstResult} on Wikipedia.`;
-          if (!summaryData.extract) {
-            window.open(`https://en.wikipedia.org/wiki/${encodeURIComponent(firstResult)}`, "_blank");
-          }
-        } else {
-          response = `Sorry, I couldn't find anything for ${query}.`;
-        }
-      } catch (err) {
-        console.error(err);
-        response = "Error while fetching data.";
+  if (msg.includes("hi pet") || msg.includes("hello pet")) return `Hi ${userName}!`;
+  if (msg.includes("who am i")) return `You're ${userName}, my awesome creator!`;
+  if (msg.includes("what's your name")) return `I'm Your Pet, your assistant and friend! 🐾`;
+  if (msg.includes("my name is gyan")) return `Hi Gyan! I think you're one of Shashwat's friends.`;
+  if (msg.includes("my name is deepak")) return `Hi Sir SDM (Sanatani Deepak Maurya), also known as the OG Coder.`;
+  if (msg.includes("my name is aditya")) return `Hi Aditya! You're the Malik, right?`;
+  if (msg.includes("what you are doing")) return `Nothing, just trying to learn something new. What are you doing?`;
+  if (msg.includes("thank you")) return `You're welcome dear, ${userName}.`;
+  if (msg.includes("yes")) return `Yaa, my owner told me about you!`;
+
+  // Basic math
+  try {
+    if (msg.startsWith("what is")) {
+      const expression = msg.replace("what is", "").replace("?", "").trim();
+      const result = eval(expression);
+      if (!isNaN(result)) {
+        return `${expression} = ${result}`;
       }
     }
+  } catch (err) {}
+
+  // Table of number
+  const match = msg.match(/table of (\d+)/i);
+  if (match) {
+    const num = parseInt(match[1]);
+    return generateTable(num);
   }
 
-  else if (command.startsWith("search") || command.startsWith("google")) {
-    let query = command.replace("search", "").replace("google", "").trim();
-    if (!query) {
-      response = "What should I search on Google?";
-    } else {
-      response = `Searching Google for ${query}...`;
-      try {
-        const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_redirect=1&no_html=1`;
-        const res = await fetch(url);
-        const data = await res.json();
-
-        if (data.AbstractText) {
-          response = data.AbstractText;
-        } else if (data.RelatedTopics && data.RelatedTopics.length > 0) {
-          response = data.RelatedTopics[0].Text || `Here are some results for ${query}.`;
-        } else {
-          response = `I couldn't find a direct answer, but I can open Google for you.`;
-          window.open(`https://www.google.com/search?q=${encodeURIComponent(query)}`, "_blank");
-        }
-      } catch (err) {
-        console.error(err);
-        response = "Error while searching Google.";
-      }
-    }
-  }
-
-  else if (command.includes("time")) {
-    response = "The current time is " + new Date().toLocaleTimeString();
-  }
-
-  else if (command.includes("date")) {
-    response = "Today’s date is " + new Date().toDateString();
-  }
-
-  else if (command.includes("hello") || command.includes("hi")) {
-    response = "Hello! How can I help you today?";
-  }
-
-  else if (command.includes("how are you")) {
-    response = "I am doing great, thank you for asking!";
-  }
-
-  else if (command.startsWith("play")) {
-    let song = command.replace("play", "").trim();
-    response = song ? `Playing ${song} on YouTube.` : "What song should I play?";
-    if (song) window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(song)}`, "_blank");
-  }
-
-  else {
-    response = "I heard: " + command;
-  }
-
-  addMessage("bot", response);
-  speak(response, useKaren);
+  return `Sorry! I'm still learning, ${userName}. Thank you for talking with me — it helps me grow!`;
 }
 
-/* ---------------- SPEECH RECOGNITION ---------------- */
-if (SpeechRecognition) {
-  recognition = new SpeechRecognition();
-  recognition.continuous = true;
-  recognition.lang = "en-US";
-
-  recognition.onresult = (event) => {
-    const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase();
-    console.log("Heard:", transcript);
-
-    if (transcript.includes("karen")) {
-      karenActive = true;
-      addMessage("bot", "Yes, I'm listening 👂");
-      speak("Yes, I'm listening", true);
-    }
-    else if (karenActive) {
-      addMessage("user", transcript);
-      handleCommand(transcript, true);
-      karenActive = false;
-    }
-    else {
-      addMessage("user", transcript);
-      handleCommand(transcript, false);
-    }
-  };
-
-  recognition.start();
-} else {
-  alert("Your browser does not support Speech Recognition 😢");
+function generateTable(n) {
+  let table = `Here is the table of ${n}:<br>`;
+  for (let i = 1; i <= 10; i++) {
+    table += `${n} × ${i} = ${n * i}<br>`;
+  }
+  return table;
 }
 
-/* ---------------- BUTTONS ---------------- */
-sendBtn.addEventListener("click", () => {
-  const text = userInput.value.trim();
-  if (text !== "") {
-    addMessage("user", text);
-    handleCommand(text, false);
-    userInput.value = "";
-  }
-});
+function greetUser(name) {
+  const chatBox = document.getElementById("chatBox");
+  if (!chatBox) return;
 
-voiceBtn.addEventListener("click", () => {
-  recognition.start();
-});
-document.getElementById("startKaren").addEventListener("click", () => {
-  recognition.start();
-  addMessage("bot", "Karen is ready! Say 'Karen' to wake me up 👂");
-  speak("Karen is ready. Say my name to wake me up.", true);
-});
-
+  const greeting = document.createElement("div");
+  greeting.className = "message bot";
+  greeting.textContent = `Welcome back, ${name}!`;
+  chatBox.appendChild(greeting);
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
