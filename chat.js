@@ -194,3 +194,9 @@ sendBtn.addEventListener("click", () => {
 voiceBtn.addEventListener("click", () => {
   recognition.start();
 });
+document.getElementById("startKaren").addEventListener("click", () => {
+  recognition.start();
+  addMessage("bot", "Karen is ready! Say 'Karen' to wake me up 👂");
+  speak("Karen is ready. Say my name to wake me up.", true);
+});
+
